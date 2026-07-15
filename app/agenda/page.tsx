@@ -1,40 +1,22 @@
 "use client";
 import { useState, useEffect } from "react";
 import { db, auth } from "../../lib/firebase"; 
-import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc, query, where } from "firebase/firestore";
+import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
 import { signOut } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
-interface Turno {
-  id: string;
-  apellido: string;
-  nombres: string;
-  documento: string;
-  fechaNac: string;
-  email: string;
-  obraSocial: string;
-  especialidad: string;
-  fechaTurno: string;
-  horaTurno: string;
-  obs: string;
-  estado: string; 
-}
-
-interface User {
-  id: string;
-  email: string;
-  status: string;
-}
+// Interfaces mantenidas igual
+interface Turno { id: string; apellido: string; nombres: string; documento: string; fechaNac: string; email: string; obraSocial: string; especialidad: string; fechaTurno: string; horaTurno: string; obs: string; estado: string; }
+interface User { id: string; email: string; status: string; }
 
 export default function AgendaPanel() {
-  const [view, setView] = useState("agenda"); // 'agenda' o 'admin'
+  const [view, setView] = useState("agenda");
   const [showModal, setShowModal] = useState(false);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
   const [formData, setFormData] = useState({
     apellido: "", nombres: "", documento: "", fechaNac: "", email: "", obraSocial: "", especialidad: "", fechaTurno: "", horaTurno: "", obs: ""
   });
-
   const [fechaReferencia, setFechaReferencia] = useState(new Date());
   const router = useRouter();
 
@@ -61,9 +43,7 @@ export default function AgendaPanel() {
     try {
       await signOut(auth);
       router.push("/");
-    } catch (error) {
-      console.error("Error al cerrar sesión", error);
-    }
+    } catch (error) { console.error(error); }
   };
 
   const handleApproveUser = async (id: string) => {
@@ -109,7 +89,7 @@ export default function AgendaPanel() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 flex">
+    <div className="min-h-screen bg-gray-100 flex text-gray-900">
       <aside className="w-64 bg-blue-800 text-white p-6 hidden md:block">
         <h2 className="text-2xl font-bold mb-8">DM KINESIO</h2>
         <nav className="space-y-2 mb-8">
@@ -125,26 +105,25 @@ export default function AgendaPanel() {
         <button onClick={handleLogout} className="w-full p-3 bg-red-500 rounded-lg font-bold hover:bg-red-600">Cerrar Sesión</button>
       </aside>
 
-      <main className="flex-1 p-8">
+      <main className="flex-1 p-8 text-gray-900">
         {view === "agenda" ? (
           <>
-            <header className="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border">
-              <div>
-                <h1 className="text-2xl font-bold text-gray-800">Agenda Semanal</h1>
-              </div>
-              <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold">+ Nuevo Turno</button>
+            <header className="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <h1 className="text-2xl font-bold text-gray-900">Agenda Semanal</h1>
+              <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Turno</button>
             </header>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border">
+            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <div className="grid grid-cols-7 gap-3 min-h-[500px]">
                 {diasSemana.map((fecha, i) => (
-                  <div key={i} className="border rounded-lg p-2 min-h-[450px]">
-                    <div className="text-center font-bold pb-2 border-b">{fecha.getDate()}</div>
+                  <div key={i} className="border border-gray-200 rounded-lg p-2 min-h-[450px]">
+                    <div className="text-center font-bold pb-2 border-b border-gray-200 text-gray-900">{fecha.getDate()}</div>
                     <div className="space-y-2 mt-2">
                       {getTurnosDelDia(fecha).map((t) => (
-                        <div key={t.id} className="text-[10px] p-2 bg-blue-600 text-white rounded">
-                          {t.horaTurno} hs - {t.nombres}
-                          <div className="flex justify-end gap-1 mt-1">
+                        <div key={t.id} className="text-[10px] p-2 bg-blue-600 text-white rounded shadow-sm">
+                          <span className="font-bold block">{t.horaTurno} hs</span>
+                          {t.nombres} {t.apellido}
+                          <div className="flex justify-end gap-1 mt-1 border-t border-white/20 pt-1">
                             <button onClick={() => handleDeleteTurno(t.id)}>🗑️</button>
                             <button onClick={() => handleUpdateEstado(t.id, 'Asistió')}>✓</button>
                           </div>
@@ -157,18 +136,24 @@ export default function AgendaPanel() {
             </div>
           </>
         ) : (
-          <div className="bg-white p-8 rounded-xl shadow-sm">
-            <h1 className="text-2xl font-bold mb-6">Gestión de Usuarios</h1>
+          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
+            <h1 className="text-2xl font-bold mb-6 text-gray-900">Gestión de Usuarios</h1>
             <table className="w-full border-collapse">
-              <thead><tr className="bg-gray-100"><th className="p-2 border">Email</th><th className="p-2 border">Estado</th><th className="p-2 border">Acciones</th></tr></thead>
+              <thead>
+                <tr className="bg-gray-100 text-gray-900">
+                  <th className="p-3 border border-gray-200 text-left">Email</th>
+                  <th className="p-3 border border-gray-200 text-left">Estado</th>
+                  <th className="p-3 border border-gray-200 text-left">Acciones</th>
+                </tr>
+              </thead>
               <tbody>
                 {usuarios.map(u => (
-                  <tr key={u.id} className="border-b">
-                    <td className="p-2 border">{u.email}</td>
-                    <td className="p-2 border">{u.status || "pending"}</td>
-                    <td className="p-2 border space-x-2">
-                      <button onClick={() => handleApproveUser(u.id)} className="bg-green-500 text-white px-2 py-1 rounded">Aprobar</button>
-                      <button onClick={() => handleDeleteUser(u.id)} className="bg-red-500 text-white px-2 py-1 rounded">Eliminar</button>
+                  <tr key={u.id} className="border-b border-gray-200 text-gray-900">
+                    <td className="p-3 border border-gray-200">{u.email}</td>
+                    <td className="p-3 border border-gray-200 font-bold">{u.status || "pending"}</td>
+                    <td className="p-3 border border-gray-200 space-x-2">
+                      <button onClick={() => handleApproveUser(u.id)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">Aprobar</button>
+                      <button onClick={() => handleDeleteUser(u.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Eliminar</button>
                     </td>
                   </tr>
                 ))}
@@ -177,8 +162,6 @@ export default function AgendaPanel() {
           </div>
         )}
       </main>
-
-      {/* Modal igual que antes... */}
     </div>
   );
 }
