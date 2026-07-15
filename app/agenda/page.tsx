@@ -2,14 +2,15 @@
 import { useState, useEffect } from "react";
 import { db, auth } from "../../lib/firebase"; 
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
-import { signOut } from "firebase/auth";
+import { signOut, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
-// Interfaces mantenidas igual
+// Interfaces
 interface Turno { id: string; apellido: string; nombres: string; documento: string; fechaNac: string; email: string; obraSocial: string; especialidad: string; fechaTurno: string; horaTurno: string; obs: string; estado: string; }
 interface User { id: string; email: string; status: string; }
 
 export default function AgendaPanel() {
+  const [loading, setLoading] = useState(true); // Estado de carga para el guardia de seguridad
   const [view, setView] = useState("agenda");
   const [showModal, setShowModal] = useState(false);
   const [turnos, setTurnos] = useState<Turno[]>([]);
@@ -19,6 +20,18 @@ export default function AgendaPanel() {
   });
   const [fechaReferencia, setFechaReferencia] = useState(new Date());
   const router = useRouter();
+
+  // Guardia de seguridad: Verifica sesión al cargar
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (!user) {
+        router.push("/");
+      } else {
+        setLoading(false);
+      }
+    });
+    return () => unsubscribe();
+  }, [router]);
 
   const fetchTurnos = async () => {
     const q = collection(db, "turnos");
@@ -35,9 +48,11 @@ export default function AgendaPanel() {
   };
 
   useEffect(() => {
-    fetchTurnos();
-    if (view === "admin") fetchUsuarios();
-  }, [view]);
+    if (!loading) {
+      fetchTurnos();
+      if (view === "admin") fetchUsuarios();
+    }
+  }, [view, loading]);
 
   const handleLogout = async () => {
     try {
@@ -87,6 +102,11 @@ export default function AgendaPanel() {
     const fs = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
     return turnos.filter(t => t.fechaTurno === fs);
   };
+
+  // Pantalla de carga mientras verifica sesión
+  if (loading) {
+    return <div className="min-h-screen flex items-center justify-center text-gray-900 font-bold">Cargando...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-gray-100 flex text-gray-900">
