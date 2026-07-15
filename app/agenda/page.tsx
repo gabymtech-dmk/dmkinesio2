@@ -5,13 +5,14 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
+// Interfaces
 interface Turno { id: string; apellido: string; nombres: string; documento: string; fechaNac: string; email: string; obraSocial: string; especialidad: string; fechaTurno: string; horaTurno: string; obs: string; estado: string; }
-interface User { id: string; email: string; status: string; }
+interface User { id: string; email: string; status: string; nombre: string; rol: string; } // Actualizado para incluir campos del admin
 
 export default function AgendaPanel() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState("agenda");
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // NUEVO: Estado para abrir/cerrar menú
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showModal, setShowModal] = useState(false);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -39,8 +40,9 @@ export default function AgendaPanel() {
     setTurnos(listaTurnos);
   };
 
+  // AQUÍ ESTÁ EL CAMBIO CLAVE: Colección "usuarios"
   const fetchUsuarios = async () => {
-    const q = collection(db, "users");
+    const q = collection(db, "usuarios"); 
     const querySnapshot = await getDocs(q);
     const listaUsuarios = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })) as User[];
     setUsuarios(listaUsuarios);
@@ -57,9 +59,19 @@ export default function AgendaPanel() {
     try { await signOut(auth); router.push("/"); } catch (error) { console.error(error); }
   };
 
-  // ... (Funciones handleApproveUser, handleDeleteUser, handleUpdateEstado, handleDeleteTurno, handleGuardar se mantienen igual)
-  const handleApproveUser = async (id: string) => { await updateDoc(doc(db, "users", id), { status: "approved" }); fetchUsuarios(); };
-  const handleDeleteUser = async (id: string) => { if(confirm("¿Eliminar?")) { await deleteDoc(doc(db, "users", id)); fetchUsuarios(); } };
+  // ACCIONES CORREGIDAS PARA MATCHEAR CON TU DB ANTIGUA
+  const handleApproveUser = async (id: string) => { 
+    await updateDoc(doc(db, "usuarios", id), { status: "aprobado" }); // Estado "aprobado"
+    fetchUsuarios(); 
+  };
+
+  const handleDeleteUser = async (id: string) => { 
+    if(confirm("¿Eliminar usuario definitivamente?")) { 
+      await deleteDoc(doc(db, "usuarios", id)); 
+      fetchUsuarios(); 
+    } 
+  };
+
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => { await updateDoc(doc(db, "turnos", id), { estado: nuevoEstado }); fetchTurnos(); };
   const handleDeleteTurno = async (id: string) => { if (window.confirm("¿Seguro?")) { await deleteDoc(doc(db, "turnos", id)); fetchTurnos(); } };
   const handleGuardar = async () => { await addDoc(collection(db, "turnos"), { ...formData, estado: "Pendiente", fechaCreacion: new Date() }); setShowModal(false); fetchTurnos(); };
@@ -71,15 +83,8 @@ export default function AgendaPanel() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex text-gray-900">
-      {/* BOTÓN DE MENÚ PARA CELULARES (Solo visible en pantallas pequeñas) */}
-      <button 
-        className="md:hidden fixed top-4 left-4 z-50 bg-blue-800 text-white p-2 rounded-lg"
-        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-      >
-        ☰ Menú
-      </button>
+      <button className="md:hidden fixed top-4 left-4 z-50 bg-blue-800 text-white p-2 rounded-lg" onClick={() => setIsSidebarOpen(!isSidebarOpen)}>☰ Menú</button>
 
-      {/* SIDEBAR - Ahora usa lógica de estado para abrirse en móvil */}
       <aside className={`${isSidebarOpen ? 'block' : 'hidden'} md:block fixed md:relative z-40 w-64 h-full bg-blue-800 text-white p-6`}>
         <h2 className="text-2xl font-bold mb-8 mt-10 md:mt-0">DM KINESIO</h2>
         <nav className="space-y-2 mb-8">
@@ -95,17 +100,16 @@ export default function AgendaPanel() {
         <button onClick={handleLogout} className="w-full p-3 bg-red-500 rounded-lg font-bold hover:bg-red-600">Cerrar Sesión</button>
       </aside>
 
-      {/* Fondo oscuro cuando el menú está abierto en móvil */}
       {isSidebarOpen && <div className="md:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setIsSidebarOpen(false)}></div>}
 
       <main className="flex-1 p-4 md:p-8 text-gray-900 overflow-x-hidden">
         {view === "agenda" ? (
+          /* ... (Cuerpo de agenda igual al anterior) ... */
           <>
             <header className="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
               <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-0">Agenda Semanal</h1>
               <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold w-full md:w-auto">+ Nuevo Turno</button>
             </header>
-
             <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
               <div className="grid grid-cols-7 gap-1 md:gap-3 min-w-[600px] md:min-w-0 min-h-[500px]">
                 {diasSemana.map((fecha, i) => (
@@ -129,7 +133,6 @@ export default function AgendaPanel() {
             </div>
           </>
         ) : (
-          /* ... Panel Admin igual ... */
           <div className="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-200">
             <h1 className="text-2xl font-bold mb-6">Gestión de Usuarios</h1>
             <div className="overflow-x-auto">
