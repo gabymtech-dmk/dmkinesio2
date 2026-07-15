@@ -1,7 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
-import { db } from "../../lib/firebase"; 
+import { db, auth } from "../../lib/firebase"; 
 import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase/firestore";
+import { signOut } from "firebase/auth";
+import { useRouter } from "next/navigation";
 
 interface Turno {
   id: string;
@@ -26,6 +28,7 @@ export default function AgendaPanel() {
   });
 
   const [fechaReferencia, setFechaReferencia] = useState(new Date());
+  const router = useRouter();
 
   const fetchTurnos = async () => {
     const q = collection(db, "turnos");
@@ -40,6 +43,15 @@ export default function AgendaPanel() {
   useEffect(() => {
     fetchTurnos();
   }, []);
+
+  const handleLogout = async () => {
+    try {
+      await signOut(auth);
+      router.push("/login");
+    } catch (error) {
+      console.error("Error al cerrar sesión", error);
+    }
+  };
 
   const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
     try {
@@ -124,14 +136,18 @@ export default function AgendaPanel() {
 
   return (
     <div className="min-h-screen bg-gray-100 flex">
-      {/* Sidebar actualizado */}
       <aside className="w-64 bg-blue-800 text-white p-6 hidden md:block">
         <h2 className="text-2xl font-bold mb-8">DM KINESIO</h2>
         <nav className="space-y-2 mb-8">
           <a href="/agenda" className="block p-3 bg-blue-900 rounded-lg font-bold border-l-4 border-white transition">📅 Agenda</a>
           <a href="/pacientes" className="block p-3 rounded-lg hover:bg-blue-700 transition">📁 Historias Clínicas</a>
         </nav>
-        <button className="w-full p-3 bg-red-500 rounded-lg font-bold">Cerrar Sesión</button>
+        <button 
+          onClick={handleLogout} 
+          className="w-full p-3 bg-red-500 rounded-lg font-bold hover:bg-red-600 transition"
+        >
+          Cerrar Sesión
+        </button>
       </aside>
 
       <main className="flex-1 p-8">
@@ -215,8 +231,6 @@ export default function AgendaPanel() {
                           </div>
 
                           <div className="flex gap-1.5 mt-2 justify-end border-t border-black/10 pt-1.5">
-                            
-                            {/* NUEVO: Botón de Historia Clínica */}
                             <button 
                               onClick={() => window.location.href = `/pacientes?dni=${t.documento}`}
                               title="Ver Historia Clínica" 
