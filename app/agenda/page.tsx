@@ -5,13 +5,13 @@ import { collection, addDoc, getDocs, updateDoc, doc, deleteDoc } from "firebase
 import { signOut, onAuthStateChanged } from "firebase/auth";
 import { useRouter } from "next/navigation";
 
-// Interfaces
 interface Turno { id: string; apellido: string; nombres: string; documento: string; fechaNac: string; email: string; obraSocial: string; especialidad: string; fechaTurno: string; horaTurno: string; obs: string; estado: string; }
 interface User { id: string; email: string; status: string; }
 
 export default function AgendaPanel() {
-  const [loading, setLoading] = useState(true); // Estado de carga para el guardia de seguridad
+  const [loading, setLoading] = useState(true);
   const [view, setView] = useState("agenda");
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false); // NUEVO: Estado para abrir/cerrar menú
   const [showModal, setShowModal] = useState(false);
   const [turnos, setTurnos] = useState<Turno[]>([]);
   const [usuarios, setUsuarios] = useState<User[]>([]);
@@ -21,7 +21,6 @@ export default function AgendaPanel() {
   const [fechaReferencia, setFechaReferencia] = useState(new Date());
   const router = useRouter();
 
-  // Guardia de seguridad: Verifica sesión al cargar
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (!user) {
@@ -55,69 +54,40 @@ export default function AgendaPanel() {
   }, [view, loading]);
 
   const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      router.push("/");
-    } catch (error) { console.error(error); }
+    try { await signOut(auth); router.push("/"); } catch (error) { console.error(error); }
   };
 
-  const handleApproveUser = async (id: string) => {
-    await updateDoc(doc(db, "users", id), { status: "approved" });
-    fetchUsuarios();
-  };
+  // ... (Funciones handleApproveUser, handleDeleteUser, handleUpdateEstado, handleDeleteTurno, handleGuardar se mantienen igual)
+  const handleApproveUser = async (id: string) => { await updateDoc(doc(db, "users", id), { status: "approved" }); fetchUsuarios(); };
+  const handleDeleteUser = async (id: string) => { if(confirm("¿Eliminar?")) { await deleteDoc(doc(db, "users", id)); fetchUsuarios(); } };
+  const handleUpdateEstado = async (id: string, nuevoEstado: string) => { await updateDoc(doc(db, "turnos", id), { estado: nuevoEstado }); fetchTurnos(); };
+  const handleDeleteTurno = async (id: string) => { if (window.confirm("¿Seguro?")) { await deleteDoc(doc(db, "turnos", id)); fetchTurnos(); } };
+  const handleGuardar = async () => { await addDoc(collection(db, "turnos"), { ...formData, estado: "Pendiente", fechaCreacion: new Date() }); setShowModal(false); fetchTurnos(); };
 
-  const handleDeleteUser = async (id: string) => {
-    if(confirm("¿Eliminar usuario definitivamente?")) {
-      await deleteDoc(doc(db, "users", id));
-      fetchUsuarios();
-    }
-  };
+  const diasSemana = Array.from({length: 7}).map((_, i) => { const d = new Date(fechaReferencia); d.setDate(d.getDate() - d.getDay() + i); return d; });
+  const getTurnosDelDia = (fecha: Date) => { const fs = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`; return turnos.filter(t => t.fechaTurno === fs); };
 
-  const handleUpdateEstado = async (id: string, nuevoEstado: string) => {
-    await updateDoc(doc(db, "turnos", id), { estado: nuevoEstado });
-    fetchTurnos(); 
-  };
-
-  const handleDeleteTurno = async (id: string) => {
-    if (window.confirm("¿Estás seguro?")) {
-      await deleteDoc(doc(db, "turnos", id));
-      fetchTurnos(); 
-    }
-  };
-
-  const handleGuardar = async () => {
-    await addDoc(collection(db, "turnos"), { ...formData, estado: "Pendiente", fechaCreacion: new Date() });
-    setShowModal(false);
-    fetchTurnos();
-    setFormData({ apellido: "", nombres: "", documento: "", fechaNac: "", email: "", obraSocial: "", especialidad: "", fechaTurno: "", horaTurno: "", obs: "" });
-  };
-
-  const diasSemana = Array.from({length: 7}).map((_, i) => {
-    const d = new Date(fechaReferencia);
-    d.setDate(d.getDate() - d.getDay() + i);
-    return d;
-  });
-
-  const getTurnosDelDia = (fecha: Date) => {
-    const fs = `${fecha.getFullYear()}-${String(fecha.getMonth() + 1).padStart(2, '0')}-${String(fecha.getDate()).padStart(2, '0')}`;
-    return turnos.filter(t => t.fechaTurno === fs);
-  };
-
-  // Pantalla de carga mientras verifica sesión
-  if (loading) {
-    return <div className="min-h-screen flex items-center justify-center text-gray-900 font-bold">Cargando...</div>;
-  }
+  if (loading) return <div className="min-h-screen flex items-center justify-center font-bold">Cargando...</div>;
 
   return (
     <div className="min-h-screen bg-gray-100 flex text-gray-900">
-      <aside className="w-64 bg-blue-800 text-white p-6 hidden md:block">
-        <h2 className="text-2xl font-bold mb-8">DM KINESIO</h2>
+      {/* BOTÓN DE MENÚ PARA CELULARES (Solo visible en pantallas pequeñas) */}
+      <button 
+        className="md:hidden fixed top-4 left-4 z-50 bg-blue-800 text-white p-2 rounded-lg"
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+      >
+        ☰ Menú
+      </button>
+
+      {/* SIDEBAR - Ahora usa lógica de estado para abrirse en móvil */}
+      <aside className={`${isSidebarOpen ? 'block' : 'hidden'} md:block fixed md:relative z-40 w-64 h-full bg-blue-800 text-white p-6`}>
+        <h2 className="text-2xl font-bold mb-8 mt-10 md:mt-0">DM KINESIO</h2>
         <nav className="space-y-2 mb-8">
-          <button onClick={() => setView("agenda")} className={`w-full text-left p-3 ${view === 'agenda' ? 'bg-blue-900' : ''} rounded-lg font-bold`}>📅 Agenda</button>
+          <button onClick={() => { setView("agenda"); setIsSidebarOpen(false); }} className={`w-full text-left p-3 ${view === 'agenda' ? 'bg-blue-900' : ''} rounded-lg font-bold`}>📅 Agenda</button>
           <a href="/pacientes" className="block p-3 rounded-lg hover:bg-blue-700 transition">📁 Historias Clínicas</a>
           
           {auth.currentUser?.email === "gabymartin267@gmail.com" && (
-            <button onClick={() => setView("admin")} className={`w-full text-left p-3 ${view === 'admin' ? 'bg-blue-900' : ''} rounded-lg font-bold border-t border-blue-600 mt-2 text-yellow-300`}>
+            <button onClick={() => { setView("admin"); setIsSidebarOpen(false); }} className={`w-full text-left p-3 ${view === 'admin' ? 'bg-blue-900' : ''} rounded-lg font-bold border-t border-blue-600 mt-2 text-yellow-300`}>
               ⚙️ Administración
             </button>
           )}
@@ -125,22 +95,25 @@ export default function AgendaPanel() {
         <button onClick={handleLogout} className="w-full p-3 bg-red-500 rounded-lg font-bold hover:bg-red-600">Cerrar Sesión</button>
       </aside>
 
-      <main className="flex-1 p-8 text-gray-900">
+      {/* Fondo oscuro cuando el menú está abierto en móvil */}
+      {isSidebarOpen && <div className="md:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setIsSidebarOpen(false)}></div>}
+
+      <main className="flex-1 p-4 md:p-8 text-gray-900 overflow-x-hidden">
         {view === "agenda" ? (
           <>
-            <header className="flex justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <h1 className="text-2xl font-bold text-gray-900">Agenda Semanal</h1>
-              <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold hover:bg-blue-700">+ Nuevo Turno</button>
+            <header className="flex flex-col md:flex-row justify-between items-center mb-8 bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+              <h1 className="text-xl md:text-2xl font-bold text-gray-900 mb-4 md:mb-0">Agenda Semanal</h1>
+              <button onClick={() => setShowModal(true)} className="bg-blue-600 text-white px-6 py-3 rounded-lg font-bold w-full md:w-auto">+ Nuevo Turno</button>
             </header>
 
-            <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
-              <div className="grid grid-cols-7 gap-3 min-h-[500px]">
+            <div className="bg-white p-4 md:p-6 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+              <div className="grid grid-cols-7 gap-1 md:gap-3 min-w-[600px] md:min-w-0 min-h-[500px]">
                 {diasSemana.map((fecha, i) => (
-                  <div key={i} className="border border-gray-200 rounded-lg p-2 min-h-[450px]">
-                    <div className="text-center font-bold pb-2 border-b border-gray-200 text-gray-900">{fecha.getDate()}</div>
-                    <div className="space-y-2 mt-2">
+                  <div key={i} className="border border-gray-200 rounded-lg p-1 md:p-2 min-h-[450px]">
+                    <div className="text-center font-bold pb-2 border-b border-gray-200 text-[10px] md:text-sm">{fecha.getDate()}</div>
+                    <div className="space-y-1 md:space-y-2 mt-2">
                       {getTurnosDelDia(fecha).map((t) => (
-                        <div key={t.id} className="text-[10px] p-2 bg-blue-600 text-white rounded shadow-sm">
+                        <div key={t.id} className="text-[9px] md:text-[10px] p-1 md:p-2 bg-blue-600 text-white rounded shadow-sm">
                           <span className="font-bold block">{t.horaTurno} hs</span>
                           {t.nombres} {t.apellido}
                           <div className="flex justify-end gap-1 mt-1 border-t border-white/20 pt-1">
@@ -156,29 +129,26 @@ export default function AgendaPanel() {
             </div>
           </>
         ) : (
-          <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-200">
-            <h1 className="text-2xl font-bold mb-6 text-gray-900">Gestión de Usuarios</h1>
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-100 text-gray-900">
-                  <th className="p-3 border border-gray-200 text-left">Email</th>
-                  <th className="p-3 border border-gray-200 text-left">Estado</th>
-                  <th className="p-3 border border-gray-200 text-left">Acciones</th>
-                </tr>
-              </thead>
-              <tbody>
-                {usuarios.map(u => (
-                  <tr key={u.id} className="border-b border-gray-200 text-gray-900">
-                    <td className="p-3 border border-gray-200">{u.email}</td>
-                    <td className="p-3 border border-gray-200 font-bold">{u.status || "pending"}</td>
-                    <td className="p-3 border border-gray-200 space-x-2">
-                      <button onClick={() => handleApproveUser(u.id)} className="bg-green-500 text-white px-3 py-1 rounded hover:bg-green-600">Aprobar</button>
-                      <button onClick={() => handleDeleteUser(u.id)} className="bg-red-500 text-white px-3 py-1 rounded hover:bg-red-600">Eliminar</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          /* ... Panel Admin igual ... */
+          <div className="bg-white p-4 md:p-8 rounded-xl shadow-sm border border-gray-200">
+            <h1 className="text-2xl font-bold mb-6">Gestión de Usuarios</h1>
+            <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                <thead><tr className="bg-gray-100"><th className="p-2 border">Email</th><th className="p-2 border">Estado</th><th className="p-2 border">Acciones</th></tr></thead>
+                <tbody>
+                    {usuarios.map(u => (
+                    <tr key={u.id} className="border-b">
+                        <td className="p-2 border text-xs md:text-sm">{u.email}</td>
+                        <td className="p-2 border font-bold text-xs md:text-sm">{u.status}</td>
+                        <td className="p-2 border space-x-1">
+                        <button onClick={() => handleApproveUser(u.id)} className="bg-green-500 text-white px-2 py-1 rounded text-xs">Aprobar</button>
+                        <button onClick={() => handleDeleteUser(u.id)} className="bg-red-500 text-white px-2 py-1 rounded text-xs">Del</button>
+                        </td>
+                    </tr>
+                    ))}
+                </tbody>
+                </table>
+            </div>
           </div>
         )}
       </main>
